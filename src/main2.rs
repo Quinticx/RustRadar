@@ -1,0 +1,170 @@
+/*
+mod radar;
+//mod instance;
+mod scan;
+
+use crate::radar::Radar;
+*/
+use bevy::prelude::*;
+
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
+
+use bevy::{prelude::*, render::camera::ScalingMode};
+use bevy::prelude::shape::Plane;
+use bevy::render::view::NoFrustumCulling;
+use bevy_aabb_instancing::VertexPullingRenderPlugin;
+
+use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+//use crate::instance::{CustomMaterialPlugin, InstanceData, InstanceMaterialData};
+
+fn main() {
+    App::new()
+        //.add_plugins((DefaultPlugins, CustomMaterialPlugin))
+        .add_plugins(PanOrbitCameraPlugin)
+        //.add_plugins( VertexPullingRenderPlugin { outlines: true })
+        .add_systems(Startup, setup)
+        //.add_systems(Update, scan::keyboard_input)
+        //.add_systems(Update, scan::visible_scans)
+        //.add_systems(Update, scan::text_update_system)
+        .run();
+}
+
+/// set up a simple 3D scene
+fn setup(
+    mut commands: Commands,
+) {
+    commands.insert_resource(AmbientLight{
+        brightness: 1000.0,
+        color: Color::WHITE,
+    });
+    commands.spawn((Camera3dBundle {
+        transform: Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ..default()
+    }, PanOrbitCamera::default(),
+    ));
+    // commands.spawn(
+    //     PbrBundle {
+    //         mesh: meshes.add(Plane::default().mesh().size(200000., 200000.)),
+    //         material: materials.add(Color::rgb(0.1, 0.5, 0.3)),
+    //         ..default()
+    //     },
+    // );
+
+    //scan::setup(&mut commands);
+}
+
+/*
+use bevy::{
+    core_pipeline::{
+        bloom::{BloomCompositeMode, BloomPrefilterSettings, BloomSettings},
+        tonemapping::Tonemapping,
+    },
+    input::mouse,
+    prelude::*,
+};
+use bevy_aabb_instancing::{Cuboid, CuboidMaterialId, Cuboids, VertexPullingRenderPlugin};
+use smooth_bevy_cameras::{controllers::fps::*, LookTransformPlugin};
+
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .insert_resource(ClearColor(Color::BLACK))
+        .insert_resource(Msaa::Off)
+        .add_plugins((
+            VertexPullingRenderPlugin { outlines: true },
+            LookTransformPlugin,
+            FpsCameraPlugin::default(),
+        ))
+        .add_systems(Startup, setup)
+        .run();
+}
+
+
+ use bevy::prelude::*;
+use bevy_aabb_instancing::{
+    Cuboid, CuboidMaterial, CuboidMaterialId, CuboidMaterialMap, Cuboids,
+    VertexPullingRenderPlugin, COLOR_MODE_SCALAR_HUE,
+};
+use smooth_bevy_cameras::{controllers::fps::*, LookTransformPlugin};
+
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .insert_resource(Msaa::Off)
+        .add_plugins((
+            VertexPullingRenderPlugin { outlines: true },
+            LookTransformPlugin,
+            FpsCameraPlugin::default(),
+        ))
+        .add_systems(Startup, setup)
+        .add_systems(Update, (update_scalar_hue_options, toggle_fps_controller))
+        .run();
+}
+
+fn setup(mut commands: Commands, mut material_map: ResMut<CuboidMaterialMap>) {
+    let material_id = material_map.push(CuboidMaterial {
+        color_mode: COLOR_MODE_SCALAR_HUE,
+        ..default()
+    });
+
+    const PATCHES_PER_DIM: usize = 20;
+    const PATCH_SIZE: usize = 150;
+    const SCENE_RADIUS: f32 = 1500.0;
+
+    for x_batch in 0..PATCHES_PER_DIM {
+        for z_batch in 0..PATCHES_PER_DIM {
+            let mut instances = Vec::with_capacity(PATCH_SIZE * PATCH_SIZE);
+            for x in 0..PATCH_SIZE {
+                for z in 0..PATCH_SIZE {
+                    let x = (x_batch * PATCH_SIZE) as f32 + x as f32 - SCENE_RADIUS;
+                    let z = (z_batch * PATCH_SIZE) as f32 + z as f32 - SCENE_RADIUS;
+                    let d = (x * x + z * z).sqrt();
+                    let amp = 0.2 * d;
+                    let y = amp * ((0.05 * x).cos() * (0.05 * z).sin());
+                    let c = Vec3::new(x, y, z);
+                    let h = 0.01 * d;
+                    let min = c - Vec3::new(0.5, h, 0.5);
+                    let max = c + Vec3::new(0.5, h, 0.5);
+                    let scalar_color = u32::from_le_bytes(d.to_le_bytes());
+                    let mut cuboid = Cuboid::new(min, max, scalar_color);
+                    cuboid.set_depth_bias(0);
+                    instances.push(cuboid);
+                }
+            }
+            let cuboids = Cuboids::new(instances);
+            let aabb = cuboids.aabb();
+            commands
+                .spawn(SpatialBundle::default())
+                .insert((cuboids, aabb, material_id));
+        }
+    }
+
+    commands
+        .spawn(Camera3dBundle::default())
+        .insert(FpsCameraBundle::new(
+            FpsCameraController {
+                translate_sensitivity: 200.0,
+                enabled: false,
+                ..Default::default()
+            },
+            Vec3::new(0.0, 100.0, 0.0),
+            Vec3::new(100.0, 0.0, 100.0),
+            Vec3::Y,
+        ));
+}
+
+fn update_scalar_hue_options(time: Res<Time>, mut material_map: ResMut<CuboidMaterialMap>) {
+    let material = material_map.get_mut(CuboidMaterialId(1));
+    let tv = 1000.0 * (time.elapsed_seconds().sin() + 1.0);
+    material.scalar_hue.max_visible = tv;
+    material.scalar_hue.clamp_max = tv;
+}
+
+fn toggle_fps_controller(
+    mouse_button_input: Res<Input<MouseButton>>,
+    mut controller: Query<&mut FpsCameraController>,
+) {
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        controller.single_mut().enabled = true;
+    }
+}*/
