@@ -1,14 +1,22 @@
 use std::path::Path;
 use std::vec::Vec;
 use bevy::math::Vec3;
+use bevy::prelude::Component;
 use walkdir::WalkDir;
 
 pub trait Radar{
-    fn get_gates(&self) ->Vec<Gate>;
+    fn get_gates(&self) ->Vec<Scan>;
 }
 
 pub struct AIRRadar{
     
+}
+
+#[derive(Component)]
+pub struct Scan {
+    pub angular_resolution: f32,
+    pub range_resolution: f32,
+    pub gates: Vec<Gate>,
 }
 
 #[derive(Debug)]
@@ -47,9 +55,9 @@ impl AIRRadar {
         let elevation = file.variable("elevation").unwrap();
         let range = file.variable("range").unwrap();
 
-        for attr in dbz.attributes() {
-            dbg!(attr.name(), attr.value().unwrap());
-        }
+        //for attr in dbz.attributes() {
+        //    dbg!(attr.name(), attr.value().unwrap());
+        //}
         // dbg!(dbz.vartype());
         let dbz_data = dbz.get_values::<i16, _>(..).unwrap();
         let azimuth_data = azimuth.get_values::<f32, _>(..).unwrap();
@@ -68,15 +76,32 @@ impl AIRRadar {
 }
 
 impl Radar for AIRRadar{
-    fn get_gates(&self) ->Vec<Gate> {
-        let mut gates = Vec::new();
-        for entry in glob::glob("AIR_cfradial/cfrad.20130531_231156_AIR_v1_s*.nc").unwrap() {
-            let entry = entry.unwrap();
-            if entry.is_file() {
-                gates.extend(self.get_gates_from_file(&entry));
+    fn get_gates(&self) ->Vec<Scan> {
+        let mut scans = Vec::new();
+
+        for entry in [
+            "AIR_cfradial/cfrad.20130531_231156_AIR_v1_s*.nc",
+            "AIR_cfradial/cfrad.20130531_231204_AIR_v2_s*.nc",
+            "AIR_cfradial/cfrad.20130531_231211_AIR_v3_s*.nc",
+            "AIR_cfradial/cfrad.20130531_231219_AIR_v4_s*.nc",
+            "AIR_cfradial/cfrad.20130531_231226_AIR_v5_s*.nc",
+        ] {
+            let mut gates = Vec::new();
+            for entry in glob::glob(entry).unwrap() {
+                let entry = entry.unwrap();
+                if entry.is_file() {
+                    gates.extend(self.get_gates_from_file(&entry));
+                }
             }
+            let angular_resolution = (16.517744_f32-16.002102_f32).to_radians();
+            let range_resolution = (gates.get(0).unwrap().range-gates.get(1).unwrap().range).abs();
+            scans.push(Scan {
+                angular_resolution,
+                range_resolution,
+                gates
+            });
         }
-        gates
+        scans
     }
 }
 
