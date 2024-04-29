@@ -1,14 +1,14 @@
-use bevy::input::{Input, InputPlugin};
+use bevy::asset::Assets;
+use bevy::input::{ButtonInput, InputPlugin};
 use bevy::math::Vec3;
 use bevy::pbr::StandardMaterial;
-use bevy::prelude::{Color, Commands, Component, Event, EventReader, EventWriter, KeyCode, Mesh, Query, Res, ResMut, Resource, SpatialBundle, TextBundle, TextStyle, Visibility, With};
+use bevy::prelude::{Color, Commands, Component, Cuboid, Event, EventReader, EventWriter, KeyCode, Mesh, Query, Res, ResMut, Resource, SpatialBundle, TextBundle, TextStyle, Visibility, With};
 use bevy::render::view::NoFrustumCulling;
 use bevy::text::{Text, TextSection};
 use bevy::ui::{Style, Val};
 use bevy::utils::default;
-use bevy_aabb_instancing::{Cuboid, CuboidMaterialId, Cuboids};
-use bevy_asset::Assets;
 use itertools::Position;
+use crate::instance::{InstanceData, InstanceMaterialData};
 //use crate::instance::{InstanceData, InstanceMaterialData};
 use crate::radar;
 use crate::scan::ScanType::Reflectivity;
@@ -44,24 +44,24 @@ pub struct InfoChanged(bool);
 
 pub fn keyboard_input(
     mut change_info: ResMut<InfoChanged>,
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     mut info: ResMut<ScanInfo>,
 ) {
-    if keys.any_just_pressed([KeyCode::Left]) {
+    if keys.any_just_pressed([KeyCode::ArrowLeft]) {
         info.number -= 1
     }
 
-    if keys.any_just_pressed([KeyCode::Right]) {
+    if keys.any_just_pressed([KeyCode::ArrowRight]) {
         info.number += 1
     }
 
-    if keys.any_just_pressed([KeyCode::Up]) {
+    if keys.any_just_pressed([KeyCode::ArrowUp]) {
         info.filter += 0.05;
         info.filter = info.filter.min(1.0);
         change_info.0 = true;
     }
 
-    if keys.any_just_pressed([KeyCode::Down]) {
+    if keys.any_just_pressed([KeyCode::ArrowDown]) {
         info.filter -= 0.05;
         info.filter = info.filter.max(0.0);
         change_info.0 = true;
@@ -92,6 +92,7 @@ pub fn text_update_system(
     }
 }
 
+/*
 pub fn update_filter_system(
     info: ResMut<ScanInfo>,
     mut change: ResMut<InfoChanged>,
@@ -117,6 +118,7 @@ pub fn update_filter_system(
         })
     }
 }
+ */
 
 
 #[derive(Component)]
@@ -124,7 +126,7 @@ pub struct ScanIndexText;
 
 pub fn setup(
     mut commands: Commands,
-    //meshes: &mut ResMut<Assets<Mesh>>,
+    mut meshes: ResMut<Assets<Mesh>>,
 ) {
     commands.insert_resource(ScanInfo::default());
     commands.insert_resource(InfoChanged(true));
@@ -172,10 +174,11 @@ pub fn setup(
         //(Color::WHITE),
     ];
 
+    let gate_mesh = meshes.add(Cuboid::new(0.5, 0.5, 0.5));
     for (i, scan) in scans.into_iter().enumerate() {
-        let cuboids = scan.gates.iter()
+        let gates = scan.gates.iter()
             .filter_map(|gate| {
-                if gate.reflectivity < 40.0 {
+                if gate.reflectivity < 25.0 {
                     return None;
                 }
 
@@ -186,29 +189,34 @@ pub fn setup(
                 let i = (gate.reflectivity / 5.0).floor() as usize;
                 let color = colors[i.min(colors.len() - 1)];
 
-                let alpha = ((gate.reflectivity - 30.0) / 30.0).min(1.0);
+                let alpha = (gate.reflectivity / (colors.len() as f32 * 5.0)).min(1.0).powf(5.0);
+                // let alpha = 0.5;//((gate.reflectivity - 30.0) / 30.0).min(1.0);
 
                 //let alpha = gate.reflectivity;
                 //let max_alpha = ((5 * colors.len()) as f32);
-                let size = Vec3::new(
-                    scan.range_resolution,
-                    scan.angular_resolution * gate.range,
-                    scan.angular_resolution * gate.range,
-                ) * alpha;
+                let size = scan.range_resolution * gate.range;
 
-                let min = gate.as_cart() - (size / 2.0);
+                let color = color.with_a(alpha);
 
-                Some(Cuboid::new(min, min + size, color.as_rgba_u32()))
+                Some(InstanceData{
+                    scale: gate.range * 0.008,
+                    position: gate.as_cart(),
+                    color: color.as_linear_rgba_f32(),
+                })
             })
             .collect();
 
-        let cuboids = Cuboids::new(cuboids);
-        let aabb = cuboids.aabb();
-        commands
-            .spawn(SpatialBundle{
+        commands.spawn((
+            gate_mesh.clone(),
+            SpatialBundle{
                 visibility: Visibility::Hidden,
-                ..SpatialBundle::default()
-            })
-            .insert((cuboids, aabb, CuboidMaterialId(0), scan, ScanNumber(i), ScanType::Reflectivity));
+                ..SpatialBundle::INHERITED_IDENTITY
+            },
+            InstanceMaterialData(gates),
+            NoFrustumCulling,
+            ScanType::Reflectivity,
+            ScanNumber(i),
+        ));
     }
+
 }

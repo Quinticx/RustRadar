@@ -1,20 +1,21 @@
 mod radar;
 mod scan;
+mod instance;
 
 use bevy::prelude::*;
-use bevy_aabb_instancing::VertexPullingRenderPlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+
+use crate::instance::{CustomMaterialPlugin, InstanceData, InstanceMaterialData};
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins((DefaultPlugins, CustomMaterialPlugin))
         .add_plugins(PanOrbitCameraPlugin)
-        .add_plugins(VertexPullingRenderPlugin { outlines: true })
         .add_systems(Startup, setup)
         .add_systems(Startup, scan::setup)
         .add_systems(Update, scan::text_update_system)
         .add_systems(Update, scan::keyboard_input)
-        .add_systems(Update, scan::update_filter_system)
+        //.add_systems(Update, scan::update_filter_system)
         .add_systems(Update, scan::visible_scans)
         .run();
 }
@@ -25,23 +26,6 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // circular base
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(shape::Circle::new(100_000.0).into()),
-        material: materials.add(Color::WHITE.into()),
-        transform: Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-        ..default()
-    });
-    // light
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
-            intensity: 1500.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        ..default()
-    });
     // camera
     commands.spawn((
         Camera3dBundle {

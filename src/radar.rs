@@ -81,10 +81,10 @@ impl Radar for AIRRadar{
 
         for entry in [
             "AIR_cfradial/cfrad.20130531_231156_AIR_v1_s*.nc",
-            "AIR_cfradial/cfrad.20130531_231204_AIR_v2_s*.nc",
-            "AIR_cfradial/cfrad.20130531_231211_AIR_v3_s*.nc",
-            "AIR_cfradial/cfrad.20130531_231219_AIR_v4_s*.nc",
-            "AIR_cfradial/cfrad.20130531_231226_AIR_v5_s*.nc",
+            //"AIR_cfradial/cfrad.20130531_231204_AIR_v2_s*.nc",
+            //"AIR_cfradial/cfrad.20130531_231211_AIR_v3_s*.nc",
+            //"AIR_cfradial/cfrad.20130531_231219_AIR_v4_s*.nc",
+            //"AIR_cfradial/cfrad.20130531_231226_AIR_v5_s*.nc",
         ] {
             let mut gates = Vec::new();
             for entry in glob::glob(entry).unwrap() {
