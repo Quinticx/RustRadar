@@ -1,12 +1,26 @@
 #import bevy_pbr::mesh_functions::{get_model_matrix, mesh_position_local_to_clip}
 
+struct InstanceUniforms {
+    alpha_power: f32,
+};
+//@group(3) @binding(0) var<uniform> instance_uniforms: InstanceUniforms;
+// @group(0) @binding(100) var<uniform> instance_uniforms: InstanceUniforms;
+
+
+
 struct Vertex {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
 
-    @location(3) i_pos_scale: vec4<f32>,
+    //@location(3) i_pos_scale: vec4<f32>,
     @location(4) i_color: vec4<f32>,
+    @location(5) i_alpha: f32,
+    @location(6) i_t_x: vec4<f32>,
+    @location(7) i_t_y: vec4<f32>,
+    @location(8) i_t_z: vec4<f32>,
+    @location(9) i_t_w: vec4<f32>,
+    //@location(5) i_rotation: array<f32, 16>,
 };
 
 struct VertexOutput {
@@ -16,17 +30,15 @@ struct VertexOutput {
 
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
-    let position = vertex.position * vertex.i_pos_scale.w + vertex.i_pos_scale.xyz;
+    let transform = mat4x4f(vertex.i_t_x, vertex.i_t_y, vertex.i_t_z, vertex.i_t_w);
+    let position = vertex.position;// * vertex.i_pos_scale.w + vertex.i_pos_scale.xyz;
     var out: VertexOutput;
-    // NOTE: Passing 0 as the instance_index to get_model_matrix() is a hack
-    // for this example as the instance_index builtin would map to the wrong
-    // index in the Mesh array. This index could be passed in via another
-    // uniform instead but it's unnecessary for the example.
+
     out.clip_position = mesh_position_local_to_clip(
-        get_model_matrix(0u),
-        vec4<f32>(position, 1.0)
+        transform * get_model_matrix(0u),
+        vec4<f32>(vertex.position, 1.0)
     );
-    out.color = vertex.i_color;
+    out.color = vec4(vertex.i_color.rgb, pow(vertex.i_color.a, vertex.i_alpha));
     return out;
 }
 
